@@ -2,6 +2,7 @@
 import nodemailer from "nodemailer";
 import User from "../models/user.js";
 
+
 // Nodemailer setup
 const transporter = nodemailer.createTransport({
   service: "Gmail",
@@ -16,50 +17,67 @@ const transporter = nodemailer.createTransport({
 
 // Route for handling form submission
 export const registerUser = async (req, res) => {
-  const { name, email, companyName, message } = req.body;
+
+  const { firstName, lastName, email, heardFrom } = req.body;
 
   // Validate that required fields are present
-  if (!name || !companyName) {
+  if (!firstName || !lastName || !email) {
     return res.status(400).json({
-      message: 'Name and Company Name are required fields.',
+      message: 'First name, last name, and email are required fields.',
     });
   }
 
   try {
-    // Check if a user with the same name or company name already exists
-    const existingUser = await User.findOne({
-      $or: [{ name }, { companyName }],
-    });
+    // Check if a user with the same email already exists
+    const existingUser = await User.findOne({ email });
 
     if (existingUser) {
-      // If a duplicate is found, return an error message
       return res.status(400).json({
-        message: 'A user with this name and company name already exists. Please use a different name or company name.',
+        message: 'A user with this email already exists. Please use a different email.',
       });
     }
 
     // Save user data to MongoDB
-    const newUser = new User({ name, email, companyName, message });
+    const newUser = new User({ name: `${firstName} ${lastName}`, email, heardFrom });
     await newUser.save();
 
-    // Send an email notification
-    const mailOptions = {
-      from: `"GEMZ INNOVATION" <${process.env.EMAIL_USER}>`, // Displayed sender name and email
-      to: process.env.NOTIFICATION_EMAIL, // Email that will receive the registration notification
+    // Email content to the website owner
+    const ownerMailOptions = {
+      from: `"GEMZ INNOVATION" <${process.env.EMAIL_USER}>`, 
+      to: process.env.NOTIFICATION_EMAIL, 
       subject: 'New User Registration',
-      text: `A new user has registered: \n\nName: ${name}\nEmail: ${email}\nCompany: ${companyName}\nMessage: ${message}`,
+      text: `A new user has registered:\n\nFirst Name: ${firstName}\nLast Name: ${lastName}\nEmail: ${email}\nHeard From: ${heardFrom}`,
     };
 
-    // Send the email
-    transporter.sendMail(mailOptions, (error, info) => {
+    // Email to the new user
+    const userMailOptions = {
+      from: `"GEMZ INNOVATION" <${process.env.EMAIL_USER}>`, 
+      to: email, 
+      subject: 'Thank you for registering!',
+      text: 'Thank you for registering with us. You will hear from us soon!',
+    };
+
+    // Send the email to the owner
+    transporter.sendMail(ownerMailOptions, error => {
       if (error) {
-        console.error('Error sending email:', error);
-        return res.status(500).json({ message: 'Error sending email', error });
+        console.error('Error sending email to owner:', error);
+        return res.status(500).json({ message: 'Error sending email to owner', error });
       }
-      console.log('Email sent:', info.response);
+
+      // Send the email to the user
+      transporter.sendMail(userMailOptions, error => {
+        if (error) {
+          console.error('Error sending email to user:', error);
+          return res.status(500).json({ message: 'Error sending email to user', error });
+        }
+        
+        console.log('Confirmation email sent to user');
+      });
+
+      console.log('Email notification sent to owner');
     });
 
-    res.status(201).json({ message: 'User registered successfully' });
+    res.status(201).json({ message: 'User registered successfully, emails sent.' });
   } catch (error) {
     console.error('Server error:', error);
     res.status(500).json({ message: 'Server error', error });

@@ -2,25 +2,26 @@
 import mongoose from "mongoose";
 
 const UserSchema = new mongoose.Schema({
-  name: {
+  firstName: {
     type: String,
-    required: [true, 'Name is required'],
+    
+    trim: true,
+  },
+  lastName: {
+    type: String,
+    
     trim: true,
   },
   email: {
     type: String,
     required: [true, 'Email is required'],
     trim: true,
+    unique: true, // Ensures the email is unique in the database
+    match: [/.+\@.+\..+/, 'Please fill a valid email address'] // Validates email format
   },
-  companyName: {
+  heardFrom: {
     type: String,
-    required: [true, 'Company name is required'],
-    trim: true,
-  },
-  message: {
-    type: String,
-    required: [true, 'Message is required'],
-    trim: true,
+    required: [true, 'Information about how you heard about us is required'],
   },
 });
 
